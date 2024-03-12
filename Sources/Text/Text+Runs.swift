@@ -119,7 +119,11 @@ extension Text.Runs {
         fatalError()
     }
     
-    func attributes(at byte: Int, affinity: Affinity = .upstream) -> [String : String]? {
+    func attributes(at byte: Int, affinity: Affinity = .upstream) -> [String : String] {
+        if byte == 0 && runs.isEmpty {
+            return [:]
+        }
+        
         var runEnd = 0
         for (i, run) in runs.enumerated() {
             runEnd += run.utf8Len
@@ -160,7 +164,7 @@ extension Text.Runs {
             runs[runs.count - 1].utf8Len += len2
             self = .richText(runs)
         case (.richText(var runs1), .richText(var runs2)):
-            if runs1.last?.attrs == runs2.last?.attrs {
+            if runs1.last?.attrs == runs2.first?.attrs {
                 runs2[0].utf8Len += runs1.last?.utf8Len ?? 0
                 runs1.removeLast()
                 self = .richText(runs1 + runs2)
@@ -176,6 +180,7 @@ extension Text.Runs {
             self = .plainText(splitIndex)
             return .plainText(len - splitIndex)
         case .richText(var runs):
+            var runStart = 0
             var runEnd = 0
             for i in runs.indices {
                 runEnd += runs[i].utf8Len
@@ -185,24 +190,13 @@ extension Text.Runs {
                     self = .richText(runs)
                     return .richText(splitRuns)
                 } else if runEnd > splitIndex {
-                    let diff = runEnd - splitIndex
-                    var splitRuns = Array(runs[i...])
-                    
-                    splitRuns[0].utf8Len -= diff
-                    if splitRuns[0].isEmpty {
-                        splitRuns.remove(at: 0)
-                    }
-                    
-                    runs.removeSubrange(i...)
-                    
-                    runs[runs.count - 1].utf8Len += diff
-                    if runs[runs.count - 1].isEmpty {
-                        runs.remove(at: runs.count - 1)
-                    }
-
+                    let splitRun = runs[i].split(index: splitIndex - runStart)!
+                    let splitRuns = [splitRun] + Array(runs[(i + 1)...])
+                    runs.removeSubrange((i + 1)...)
                     self = .richText(runs)
                     return .richText(splitRuns)
                 }
+                runStart = runEnd
             }
             fatalError()
         }
